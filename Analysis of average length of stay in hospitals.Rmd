@@ -1,0 +1,250 @@
+---
+title: "Analysis of Average length of stays in hospitals (Australia)"
+author: "Shekhar Hazari"
+output: 
+  powerpoint_presentation: 
+    toc: yes
+---
+
+## Introduction
+
+How does an individual choose what hospital to go to if they have a condition which requires the individual to be admitted in for care?
+The natural answer comes down to:
+- Efficiency
+One measure for efficiency is 'Average Length of stay'.
+
+- Average Length of stay: The average length of stay in hospitals (ALOS) is often used as an indicator of efficiency. All other things being equal, a shorter stay will reduce the cost per discharge and shift care from inpatient to less expensive post-acute settings. The ALOS refers to the average number of days that patients spend in hospital. It is generally measured by dividing the total number of days stayed by all inpatients during a year by the number of admissions or discharges. Day cases are excluded. The indicator is presented both for all acute care cases and for childbirth without complications.
+
+## Introduction (Contd.)
+
+- There are 30034 observation in the data for different hospitals along with the reason for admission and different years but we will only analyze Average length of stay with the peer group (Large or Medium) that is 10251 observations.
+
+- We will use R-Studio to analyze the difference in Average Length of Stay in Large and Medium sized hospitals to see if they have any significand differences in their mean.
+
+- Use visualizations and statistical summaries along the lines to see how the data is distributed.
+
+## Problem Statement
+
+- The aim of our investigation is to understand if there is any statistically significant difference in the average length of stay (ALOS) between large and medium hospitals which might make patients choose one over the other
+
+- There are total 30034 rows of data out of which so I only analyze Large and Medium Hospitals.
+
+- Will filter out the NP values because the data glossary says 'Reported data did not meet the criteria to calculate this indicator'. Therefore not substituting these values in any way.
+
+## Data
+- The data has been downloaded from the website of 'Australian Institute of Health and Welfare'
+
+- The Data has been collected over 6 years 2011-2017 for hospitals in Australia with defined peer groups based on size (like Medium and Large) and major practice in Hospital (like Children's Hospital).
+
+- The data is also broken by States and Local hospital Network and type of Procedure.
+
+- The metrics like number of stays, number of overnight stays, and total overnight patient bed days go on to make the metric in question - 'Average Length of stay'
+
+## Data (Contd...)
+The important variables in the data which will be used for analysis are:
+- Average length of Stay
+- Peer group
+
+-The metric "ALOS" can not be calculated for certain observations in data so I have used the function 'na.omit' to filter out these observations.
+
+-The peer group to be analyzed in the data were only Large Hospitals and Medium Hospitals so the rest of the peer groups have been filtered out.
+
+## Load Data
+```{r Loading required Libraries, warning=FALSE, include=FALSE}
+#Loading the libraries required
+library(readxl)
+library(dplyr)
+library(magrittr)
+library(moments)
+library(car)
+```
+
+
+```{r Loading and cleaning data, echo=TRUE, warning=FALSE}
+#Reading the data (Only keeping 'Average Length of stay' and 'Peer Group')
+alos_data <- read_excel("C:/Users/shekh/Downloads/RMIT/Semester 1/Applied Analytics/Assignment 2/average-length-of-stay-multilevel-data.xlsx",range="A13:R30034",col_types=c("skip","skip","skip","skip","text","skip","skip","skip","skip","skip","skip","skip","skip","numeric","skip","skip", "skip", "skip"))
+
+#Remove all rows of data where  Average Length of stay is null or NP
+alos_data <- na.omit(alos_data, cols = `Average length of stay (days)`)
+
+#Keep only Medium and Large Hospitals
+final_data <- alos_data %>% filter(`Peer group` == 'Large hospitals' | `Peer group` == 'Medium hospitals')
+head(final_data)
+```
+
+## Descriptive Statistics
+```{r Overall Summary Statistics, echo=TRUE, warning=FALSE}
+#Summary stats for Overall Average Length of Stay
+final_data %>% summarise(Min = min(`Average length of stay (days)`),
+                         Q1 = quantile(`Average length of stay (days)`, probs = 0.25),
+                         Median = median(`Average length of stay (days)`),
+                         Q3 = quantile(`Average length of stay (days)`, probs = 0.75),
+                         Max = max(`Average length of stay (days)`),
+                         Mean = mean(`Average length of stay (days)`),
+                         SD = sd(`Average length of stay (days)`),
+                         n = n())
+```
+
+```{r Summary statistics by Peer Group, echo=TRUE, warning=FALSE}
+#Group data by Peer Group
+by_peer <- final_data %>% group_by(`Peer group`)
+
+#Summary stats grouped by peer group
+by_peer %>% summarise(Min = min(`Average length of stay (days)`),
+                      Q1 = quantile(`Average length of stay (days)`, probs = 0.25),
+                      Median = median(`Average length of stay (days)`),
+                      Q3 = quantile(`Average length of stay (days)`, probs = 0.75),
+                      Max = max(`Average length of stay (days)`),
+                      Mean = mean(`Average length of stay (days)`),
+                      SD = sd(`Average length of stay (days)`),
+                      n = n())
+```
+
+## Color Legends
+
+- From this point onwards, the following color legend is used:
+  Overall Data: Light Green
+  Large Hospitals: Orange
+  Medium Hospitals: Light Blue
+
+## Boxplots
+```{r Box Plots, echo=TRUE, warning=FALSE}
+#Creating subsets of data by peer group
+large <- final_data %>% filter(`Peer group` == 'Large hospitals')
+medium <- final_data %>% filter(`Peer group` == 'Medium hospitals')
+
+#Boxplots for infering how sparse the data is:
+#For overall
+boxplot(final_data$`Average length of stay (days)`,
+        ylab = 'Both Categories',
+        horizontal = TRUE,
+        col = 'lightgreen')
+
+#For Large Hsopitals
+boxplot(large$`Average length of stay (days)`,
+        ylab = 'Hospital Peer Group: Large',
+        horizontal = TRUE,
+        col = 'orange')
+
+#For Medium Hospitals
+boxplot(medium$`Average length of stay (days)`,
+        ylab = 'Hospital Peer Group: Medium',
+        horizontal = TRUE,
+        col = 'lightblue')
+```
+
+## Histograms with overlayed Kernel Distribution plots
+```{r Histograms for normality, echo=TRUE}
+#Overlayed distribution curve on histogram for Overall data and category wise data
+#For Overall data
+final_max = max(final_data$`Average length of stay (days)`)
+final_min = min(final_data$`Average length of stay (days)`)
+
+hist(final_data$`Average length of stay (days)`,
+     breaks = seq(final_min, final_max, (final_max-final_min)/20),
+     xlim = c(0, 15),
+     freq = FALSE,
+     xlab = 'Average Length of Stay',
+     ylim = c(0,0.35),
+     ylab = 'Density',
+     col = 'lightgreen',
+     main = 'Distribution of Overall ALOS')
+curve(dnorm(x, mean = mean(final_data$`Average length of stay (days)`),
+            sd = sd(final_data$`Average length of stay (days)`)),
+      add = TRUE,
+      col = 'black',
+      lwd = 2)
+
+#For Large Hospitals
+large_min = min(large$`Average length of stay (days)`)
+large_max = max(large$`Average length of stay (days)`)
+
+hist(large$`Average length of stay (days)`,
+     breaks = seq(large_min, large_max, (large_max-large_min)/20),
+     xlim = c(0, 15),
+     freq = FALSE,
+     xlab = 'Average Length of Stay',
+     ylim = c(0,0.35),
+     ylab = 'Density',
+     col = 'orange',
+     main = 'Distribution of ALOS in Large Hospitals')
+curve(dnorm(x, mean = mean(large$`Average length of stay (days)`),
+            sd = sd(large$`Average length of stay (days)`)),
+      add = TRUE,
+      col = 'black',
+      lwd = 2)
+
+#For Medium Hospitals
+medium_max = max(medium$`Average length of stay (days)`)
+medium_min = min(medium$`Average length of stay (days)`)
+
+hist(medium$`Average length of stay (days)`,
+     breaks = seq(medium_min, medium_max, (medium_max-medium_min)/20),
+     xlim = c(0, 15),
+     freq = FALSE,
+     xlab = 'Average Length of Stay',
+     ylim = c(0,0.35),
+     ylab = 'Density',
+     col = 'lightblue',
+     main = 'Distribution of ALOS in Medium Hospitals')
+curve(dnorm(x, mean = mean(medium$`Average length of stay (days)`),
+            sd = sd(medium$`Average length of stay (days)`)),
+      add = TRUE,
+      col = 'black',
+      lwd = 2)
+```
+
+## QQ-Plots for Large and Medium Hospitals
+
+```{r QQ-Plots for Normality, echo=TRUE, warning=FALSE}
+#Creatng qqplots
+#For Large Hsopitals
+large$`Average length of stay (days)` %>% qqPlot(dist = 'norm',
+                                                 main = 'QQ Plot for ALOS in Large Hospitals',
+                                                 xlab = 'Norm Quantiles',
+                                                 ylab = 'ALOS in days')
+
+#For Medium Hospitals
+medium$`Average length of stay (days)` %>% qqPlot(dist = 'norm',
+                                                  main = 'QQ plot for ALOS in Medium Hospitals',
+                                                  xlab = 'Norm Quantiles',
+                                                  ylab = 'ALOS in days')
+```
+
+## Analysis Summary
+
+- To begin with, box plots give us an idea that the overall data is right skewed because of many outliers to the right.
+
+- Further developement of histograms with overlayed distribution plot confirm the skewness in the ditribution.
+
+-Although in a large sample size (>35) the data does not necessarily have to be normal but to show the skewness we plot a quartile-quartile plot for both the Peer groups
+
+-It is safe to say that the data is not distributed normally infact it is highly skewed towards right but because of the number of observation we go ahead for hypothesis testing.
+
+## Test for homogenity of variance
+
+To check if the variance of the data in question is homogenious we perform a check called 'Levene Test'
+
+```{r Levene Test, echo=TRUE, warning=FALSE}
+#Checking Homogenity of Variance using Levene Test
+leveneTest(`Average length of stay (days)` ~ `Peer group`, data = final_data)
+#Since Pr(>F) is 0.00004707 which is less that 0.05 therefore it is not safe to assume equal variance
+```
+
+
+## t-test
+
+-Since the variance of the data is not homogenous we can not assume equality of variance.
+
+-We define the hypothesis as following:
+  Ho: The means of Average length of Stay at Medium Hospital and Large hospitals are equal.
+  H1: The means of ALOS are different for both the peer groups.
+```{r t-test, echo=TRUE, warning=FALSE}
+#Perfroming t-test not assuming equal variance
+t.test(
+  `Average length of stay (days)`~`Peer group`,
+  data = final_data,
+  var.equal = FALSE,
+  alternative = 'two.sided'
+)
+```
